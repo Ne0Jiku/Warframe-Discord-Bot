@@ -9,3 +9,4 @@ module.exports = {
         await interaction.reply({content: 'Pong !', ephemeral: true});
     }
 }
+

@@ -1,46 +1,69 @@
-const { axios } = require('axios');
+const axios = require('axios');
+// const client = require('../index.js');
+require('dotenv').config();
+
+let statusMessageId = null;
 
 async function getOpenWorldStatus() {
-    try {
-        const response = await axios.get('https://api.tenno.tools/cycles');
-        const cycles = response.data;
+    const response = await axios.get('https://api.warframestat.us/pc/');
+    const cycles = response.data;
+    // console.log(cycles);
 
-        const cetus = cycles.cetus;
-        const vallis = cycles.vallis;
-        const cambion = cycles.cambion;
+    const cetus = cycles.cetusCycle;
+    const vallis = cycles.vallisCycle;
+    const cambion = cycles.cambionCycle;
 
-        const cetusState = cetus.isDay ? 'Jour' : 'Nuit';
-        const vallisState = vallis.isWarm ? 'Chaud' : 'Froid';
-        const cambionState = cambion.active === 'fass' ? 'Fass' : 'Vome';
+    const cetusState = cetus.isDay ? 'Day' : 'Night';
+    const vallisState = vallis.isWarm ? 'Warm' : 'Cold';
+    const cambionState = cambion.active === 'fass' ? 'Fass' : 'Vome';
 
-        const message = `
+    const message = `
         **Cetus (Plaines d'Eidolon)** : ${cetusState} (se termine dans ${cetus.timeLeft})
         **Orb Vallis** : ${vallisState} (se termine dans ${vallis.timeLeft})
         **Cambion Drift** : ${cambionState} (se termine dans ${cambion.timeLeft})
-    `;
-        await interaction.reply(message);
-    } catch (error) {
-        console.error('Erreur lors de la récupération des données des cycles:', error);
-        return('❌ Impossible de récupérer les informations des mondes ouverts.');
-    }
+        `;
+    console.log(message);
+    // await interaction.reply(message);
+    return message;
 }
 
-async function sendStatusToDiscord() {
+async function sendStatusToDiscord(client) {
+    if (!client || !client.channels) {
+        console.error("Erreur : client ou client.channels est undefined.");
+        return;
+    }
+
     const statusMessage = await getOpenWorldStatus();
+    const channel = await client.channels.fetch(process.env.CHANNEL_ID);
 
-    const webhookUrl = 'https://discord.com/api/webhooks/1337038720464846868/55TyVTqmu_7Ia3xnrWayH7NzBewzfCwRtcu8I2W6LhfGQwim6TzF8D6w3f7rsZp0qczc';
+    if (!channel) {
+        console.error("Erreur: Impossible de trouver le channel.");
+        return;
+    }
 
-    const payload = {
-        const: statusMessage
-    };
-
-    try {
-        await axios.post(webhookUrl, payload);
-        console.log('Message envoyé avec succès');
-    } catch (error) {
-        console.error('C\'est qui succès ? j\'ai eu que ça :', error);
+    if (statusMessageId) {
+        try {
+            const message = await channel.messages.fetch(statusMessageId);
+            await message.edit(statusMessage);
+            console.log('Message mis à jour avec succès');
+        } catch (error) {
+            console.error('Erreur lors de la mise à jour du message:', error);
+        }
+    } else {
+        try {
+            const message = await channel.send(statusMessage);
+            statusMessageId = message.id;
+            console.log('Message envoyé avec succès');
+        } catch (error) {
+            console.error('Erreur lors de l\'envoi du message:', error);
+        }
     }
 }
 
-// module.exports = getOpenWorldStatus;
-module.exports = { sendStatusToDiscord };
+function startRealTimeUpdates(client, interval = 60000) { // Default interval is 60 seconds
+    setInterval(async () => {
+        await sendStatusToDiscord(client);
+    }, interval);
+}
+
+module.exports = { startRealTimeUpdates, sendStatusToDiscord };
